@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Farm Simulator</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .info {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .info h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .info pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:active {
+            background: #45a049;
+        }
+        .error { background: #f44336; }
+        .success { background: #4CAF50; }
+        .warning { background: #ff9800; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Info</h1>
+    
+    <div class="info">
+        <h3>Telegram Data</h3>
+        <pre id="tgData">Загрузка...</pre>
+    </div>
+    
+    <div class="info">
+        <h3>API Tests</h3>
+        <button onclick="testAPI()">Тест API</button>
+        <button onclick="testRegister()">Тест регистрации</button>
+        <button onclick="testUser()">Тест получения данных</button>
+        <pre id="apiResult"></pre>
+    </div>
+    
+    <div class="info">
+        <h3>Netlify Info</h3>
+        <pre id="netlifyInfo">
+Проверь в Netlify Dashboard:
+1. Functions → api (должна быть Active)
+2. Environment variables → DATABASE_URL (должна быть настроена)
+3. Deploys → последний деплой (должен быть успешным)
+        </pre>
+    </div>
+    
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        // Показать Telegram данные
+        document.getElementById('tgData').textContent = JSON.stringify({
+            user: tg.initDataUnsafe.user,
+            platform: tg.platform,
+            version: tg.version
+        }, null, 2);
+        
+        async function testAPI() {
+            const result = document.getElementById('apiResult');
+            result.textContent = 'Тестирую API...';
+            
+            try {
+                const response = await fetch('/api/user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: 999999999 })
+                });
+                
+                const data = await response.json();
+                
+                result.textContent = `Status: ${response.status}\n\n` +
+                    `Response:\n${JSON.stringify(data, null, 2)}`;
+                
+                if (response.status === 404 && data.error === 'User not found') {
+                    result.textContent += '\n\n✅ API работает правильно!';
+                }
+            } catch (error) {
+                result.textContent = `❌ Ошибка: ${error.message}\n\n` +
+                    `API не работает!\n\n` +
+                    `Проверь:\n` +
+                    `1. Functions задеплоились?\n` +
+                    `2. DATABASE_URL настроена?\n` +
+                    `3. Загружено через Git?`;
+            }
+        }
+        
+        async function testRegister() {
+            const result = document.getElementById('apiResult');
+            const userId = tg.initDataUnsafe.user?.id || Math.floor(Math.random() * 1000000);
+            const farmName = `TestFarm${Math.floor(Math.random() * 1000)}`;
+            
+            result.textContent = 'Регистрирую...';
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: userId,
+                        username: tg.initDataUnsafe.user?.username || 'test',
+                        farmName: farmName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                result.textContent = `Status: ${response.status}\n\n` +
+                    `Response:\n${JSON.stringify(data, null, 2)}`;
+                
+                if (response.ok) {
+                    result.textContent += '\n\n✅ Регистрация работает!';
+                } else {
+                    result.textContent += '\n\n⚠️ Ошибка регистрации';
+                }
+            } catch (error) {
+                result.textContent = `❌ Ошибка: ${error.message}`;
+            }
+        }
+        
+        async function testUser() {
+            const result = document.getElementById('apiResult');
+            const userId = tg.initDataUnsafe.user?.id;
+            
+            if (!userId) {
+                result.textContent = '❌ Нет user ID из Telegram';
+                return;
+            }
+            
+            result.textContent = 'Получаю данные...';
+            
+            try {
+                const response = await fetch('/api/user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: userId })
+                });
+                
+                const data = await response.json();
+                
+                result.textContent = `Status: ${response.status}\n\n` +
+                    `Response:\n${JSON.stringify(data, null, 2)}`;
+                
+                if (response.ok) {
+                    result.textContent += '\n\n✅ Данные получены!';
+                } else if (response.status === 404) {
+                    result.textContent += '\n\n⚠️ Пользователь не найден.\nНужна регистрация.';
+                }
+            } catch (error) {
+                result.textContent = `❌ Ошибка: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
